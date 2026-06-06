@@ -2,8 +2,8 @@
 
 A highly fault-tolerant, multi-threaded Edge AI gateway designed for real-time flood and debris monitoring at Huanggang Creek. This system tackles the "NMS Latency Tax" and extreme data frequency mismatches by decoupling I/O from inference, fusing heterogeneous sensor data, and implementing robust graceful degradation for remote edge nodes.  
 
-Imagine placing a small computer (an edge node) next to Huanggang Creek to monitor floods. It has a camera watching for driftwood and a sensor measuring water levels. 
-The core problem is Time and Resources:  
+Imagine placing a small computer (an edge node) next to Huanggang Creek to monitor floods. It has a camera watching for driftwood and a sensor measuring water levels.  
+The core problem is **Time** and **Resources**:
 - The water sensor blasts data at 20 times a second (20Hz).
 - The camera and AI (YOLO) are heavy, taking a long time to process, meaning they only output results 2 times a second (2Hz).
 ---
@@ -11,6 +11,33 @@ The core problem is Time and Resources:
 ## 🏗️ System Architecture
 
 The pipeline strictly decouples high-frequency scalar data from low-frequency tensor data to prevent deadlocks and Out-Of-Memory (OOM) crashes on constrained 2-Core edge hardware.  
+
+```mermaid
+graph TD
+    subgraph Edge Device
+        direction TB
+        
+        %% Producers
+        S[Ultrasonic Sensor Simulation<br/>20Hz] -->|math.sin + noise| SQ[Bounded Queue<br/>maxsize=100]
+        C[Surveillance Camera Feed<br/>Mock Frames] --> QC[QC & Diff Detector<br/>Wake Threshold: 0.15m]
+        
+        %% Consumer / Inference
+        QC -- Active Alarm --> Y[YOLOv10 / TFLite INT8<br/>2Hz Inference]
+        QC -- Calm Water --> Z[Power-Saving Mode<br/>Sleep]
+        Y --> VQ[Bounded Queue<br/>maxsize=1<br/>Drop-and-Replace]
+        
+        %% Orchestrator
+        SQ --> F{Temporal Alignment<br/>Orchestrator}
+        VQ --> F
+        
+        F -->|Nearest-Neighbor Join<br/>Tolerance < 100ms| P[Protocol Packager]
+    end
+
+    subgraph Cloud Exfiltration
+        P -->|70% Success| M((MQTT Broker<br/>QoS 1))
+        P -->|30% Failure / No Network| L[(local_backup.jsonl<br/>Graceful Degradation)]
+    end
+```
 
 ### 1. The Sensor Thread
 - Constantly generates simulated water level data at 20Hz.
@@ -100,9 +127,15 @@ The terminal will actively log the system state, demonstrating the power-saving 
     -> [CLOUD] Upload success (MQTT QoS 1).
     -> [FATAL COMM] Network down. Triggering DLQ Local Cache.
 ```
+### Output
+Below is a output from a test run:  
+
+<img width="650" height="504" alt="output1" src="https://github.com/user-attachments/assets/a8d429ec-7fe0-4e52-8ef2-f0b53b2b24e7" />  
+<img width="650" height="504" alt="output2" src="https://github.com/user-attachments/assets/f9de20ae-7a02-49c8-9ffd-ddde3b05a199" />  
+<img width="650" height="504" alt="output3" src="https://github.com/user-attachments/assets/f63594bb-393d-4c58-902a-2310e6f9c972" />  
 
 ### Local Fallback Validation (`local_backup.jsonl`)
-When the network fails, payloads are serialized to disk locally. Example entries:
+When the network fails, payloads are serialized to disk locally. Example entries (from actual entries):
 
 ```json
 {"timestamp": 1780756727.4625485, "water_level_m": 2.305, "driftwood_detections": 1, "sync_error_ms": 33.8, "ai_latency_ms": 204.12}
