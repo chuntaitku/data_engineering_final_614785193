@@ -1,0 +1,15 @@
+# --- Core Math & Vision ---
+numpy
+opencv-python-headless
+
+# --- Edge AI Models ---
+ultralytics
+
+# --- Cloud Exfiltration ---
+paho-mqtt
+
+# --- TFLite Engine
+tflite-runtime
+
+
+tensorflow
