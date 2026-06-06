@@ -69,6 +69,11 @@ Designed and profiled on and for lightweight environments.
    ```bash
    pip install -r requirements.txt
    ```
+   or
+     
+   ```bash
+   pip install numpy opencv-python-headless ultralytics paho-mqtt tensorflow
+   ```
    > **Note**: Linux users may need to run `sudo apt-get install libopenblas-dev liblapack-dev` if OpenCV raises backend array errors.
 
 ---
